@@ -1,0 +1,15 @@
+---
+title: "Rep Data Project 2 (BETTER TITLE NEEDED)"
+author: "Gene Kaufman"
+date: "January 12, 2016"
+output: html_document
+---
+
+## Synopsis
+
+Synopsis: Immediately after the title, there should be a synopsis which describes and summarizes your analysis in at most 10 complete sentences.
+
+## Data Processing
+
+## Results
+
