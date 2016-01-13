@@ -57,63 +57,79 @@ levels(data_pass2$EVTYPE) <- as.factor(str_trim(unique(c(levels(data_pass2$EVTYP
 #data_pass2$EVTYPE[grepl("THUNDERSTORM",data_pass2$EVTYPE)]<-as.factor("thunderstorm")
 data_pass2<-droplevels(data_pass2)
 levels(data_pass2$EVTYPE) <- gsub("  "," ",levels(data_pass2$EVTYPE))
-
-levels(data_pass2$EVTYPE) <- gsub("FIRES","FIRE",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("UNSEASONABLE","UNSEASONABLY",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("TUNDER","THUNDER",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUNDERT","THUNDERS",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("TORNDAO","TORNADO",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUNDERE","THUNDER",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUNDEER","THUNDER",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUNER","THUNDER",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUDER","THUNDER",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("WINDS","WIND",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("SQUALL$","SQUALLS",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("TROM","TORM",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("SORM","STORM",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("MUD ","MUD",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("SLIDES","SLIDE",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub(" FLD","",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("/ ","/",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub(" AND ","/",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("ICE ON ROAD","ICY ROADS",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("ICE ROADS","ICY ROADS",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("HVY","HEAVY",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("\\\\","/",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub(" AND ","/",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub(" FLD$","",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("/ ","/",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("//","/",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("/SML","/SMALL",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("/SMALL"," SMALL",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("COASTALSTORM","COASTAL STORM",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("AVALANCE","AVALANCHE",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("COASTALSTORM","COASTAL STORM",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("HVY","HEAVY",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("ICE ON ROAD","ICY ROADS",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("ICE ROADS","ICY ROADS",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("BLACK ICE","ICY ROADS",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("LAKE EFFECT","LAKE-EFFECT",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("LIGHTING","LIGHTNING",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("LIGNTNING","LIGHTNING",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("MUD ","MUD",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("PRECIP$","PRECIPITATION",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("SLIDES","SLIDE",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("SQUALL$","SQUALLS",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("THUDER","THUNDER",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("THUNDEER","THUNDER",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("THUNDERE","THUNDER",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("THUNDERT","THUNDERS",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("THUNER","THUNDER",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("THUNDERTSORM","THUNDERSTORM",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("THUNDERSORM","THUNDERSTORM",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("TORNDAO","TORNADO",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("TROM","TORM",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("TSTM","THUNDERSTORM",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("TUNDER","THUNDER",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("UNSEASONABLE","UNSEASONABLY",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("WINDCHILL","WIND CHILL",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("WINDS","WIND",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("COLD/WIND","COLD/WIND CHILL",levels(data_pass2$EVTYPE))
 
-#gsub("FIRE","FIREXXXX",levels(data_pass2$EVTYPE))
+# Special case - explicitly renamed in NWS documentation
+levels(data_pass2$EVTYPE) <- gsub("LANDSLIDE","DEBRIS FLOW",levels(data_pass2$EVTYPE))
+
+# Special cases - explicitly mentioned in event type description in NWS documentation
+data_pass2$EVTYPE[grepl("HYPOTHERMIA",data_pass2$EVTYPE)]<-as.factor("COLD/WIND CHILL")
+data_pass2$EVTYPE[grepl("SLIDE",data_pass2$EVTYPE)]<-as.factor("DEBRIS FLOW")
+data_pass2$EVTYPE[grepl("FREEZE",data_pass2$EVTYPE)]<-as.factor("FROST/FREEZE")
+levels(data_pass2$EVTYPE) <- gsub("ASTRONOMICAL HIGH TIDE","STORM SURGE/TIDE",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("HIGH TIDES","STORM SURGE/TIDE",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("STORM SURGE","STORM SURGE/TIDE",levels(data_pass2$EVTYPE))
+levels(data_pass2$EVTYPE) <- gsub("BEACH EROSION","HIGH SURF",levels(data_pass2$EVTYPE))
+data_pass2$EVTYPE[grepl("SURF",data_pass2$EVTYPE)]<-as.factor("HIGH SURF")
+levels(data_pass2$EVTYPE) <- gsub("DROWNING","RIP CURRENT",levels(data_pass2$EVTYPE))
+data_pass2$EVTYPE[grepl("BURST",data_pass2$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
+data_pass2$EVTYPE[grepl("GUSTNADO",data_pass2$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
+data_pass2$EVTYPE[grepl("LANDSPOUT",data_pass2$EVTYPE)]<-as.factor("TORNADO")
+data_pass2$EVTYPE[grepl("FIRE",data_pass2$EVTYPE)]<-as.factor("WILDFIRE")
+data_pass2$EVTYPE[grepl("WINTRY",data_pass2$EVTYPE)]<-as.factor("WINTER WEATHER")
+data_pass2$EVTYPE[grepl("DAM BREAK",data_pass2$EVTYPE)]<-as.factor("FLASH FLOOD")
+
 data_pass2<-droplevels(data_pass2)
 message("48:: ", length(levels(data_pass2$EVTYPE)))
 
-# temporarily rename marine t** Wind to MTW so that we don't lose them
+# temporarily rename MARINE THUNDERSTORM WIND to mtsw so that we don't lose it
 levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),"mtsw")
 data_pass2$EVTYPE[grepl("MARINE THUNDERSTORM WIND",data_pass2$EVTYPE)]<-as.factor("mtsw")
-data_pass2$EVTYPE[grepl("MARINE TSTM WIND",data_pass2$EVTYPE)]<-as.factor("mtsw")
 
-#levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),"ntw")
-data_pass2$EVTYPE[grepl("NON[- ]TSTM WIND",data_pass2$EVTYPE)]<-as.factor("HIGH WIND")
-#data_pass2$EVTYPE[grepl("MARINE TSTM WIND",data_pass2$EVTYPE)]<-as.factor("MTSW")
+# this is specifically NOT a thunderstorm, so rename it
+data_pass2$EVTYPE[grepl("NON[- ]THUNDERSTORM WIND",data_pass2$EVTYPE)]<-as.factor("HIGH WIND")
 
 # some special cases
 levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),"HURRICANE (TYPHOON)")
 data_pass2$EVTYPE[grepl("HURRICANE",data_pass2$EVTYPE)]<-as.factor("HURRICANE (TYPHOON)")
 data_pass2$EVTYPE[grepl("THUNDERSTORM",data_pass2$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
-data_pass2$EVTYPE[grepl("TSTM",data_pass2$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
 
-data_pass2$EVTYPE[grepl("LIGNTNING",data_pass2$EVTYPE)]<-as.factor("LIGHTNING")
-data_pass2$EVTYPE[grepl("LIGHTING",data_pass2$EVTYPE)]<-as.factor("LIGHTNING")
-
-data_pass2$EVTYPE[grepl("MUD",data_pass2$EVTYPE)]<-as.factor("MUDSLIDE")
-data_pass2$EVTYPE[grepl("MIXED PRECIPITATION",data_pass2$EVTYPE)]<-as.factor("MIXED PRECIP")
-
-#data_pass2$EVTYPE[gsub("  ",data_pass2$EVTYPE)]<-as.factor("MIXED PRECIP")
+# restore MARINE THUNDERSTORM WIND
+data_pass2$EVTYPE[grepl("mtsw",data_pass2$EVTYPE)]<-as.factor("MARINE THUNDERSTORM WIND")
 
 for(i in 1:nrow(et)) {
   thisone<-levels(et$EventType)[i]
@@ -126,13 +142,9 @@ for(i in 1:nrow(et)) {
 data_pass2<-droplevels(data_pass2)
 message("56:: ", length(levels(data_pass2$EVTYPE)))
 
-table(levels(data_pass2$EVTYPE))
+EVTYPE_TABLE <- data.frame(levels(data_pass2$EVTYPE))
+unmatched<-data.frame(setdiff(data_pass2$EVTYPE, et$EventType))
 
-
-
-
-
-data_pass3<-droplevels(data_pass3)
 
 # Population health = FATALITIES, INJURIES
 
