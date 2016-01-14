@@ -44,18 +44,28 @@ data_pass2 <- data_pass1a %>%
 
 data_pass2a<-data_pass2
 
-message("34:: ", length(levels(data_pass2$EVTYPE)))
-data_pass2<-droplevels(data_pass2)
-message("36:: ", length(levels(data_pass2$EVTYPE)))
+########## START EVENT TYPE MUNGING #########
+# Strategy to clean up messy event types:
+# 1. Records with events that cannot be matched at all will be ignored
+# 2. Attempt to reduce number of distinct events by removing non-letters,
+#     clean up spacing, expand abbreviations and fix obvious misspellings
+# 3. Explicitly replace events that are mentioned in the NWS documentation
+#     as being counted as another event
+# 4. Loop through official event list, replacing record events if the official
+#     event is a substring of the recorded event (e.g. "TORNADO F1" -> "TORNADO")
+
+message("[Initial] #Levels :: ", length(levels(data_pass2$EVTYPE)))
+data_pass2<-droplevels(data_pass2) # drop unused levels
+message("[Drop 1 ] #Levels :: ", length(levels(data_pass2$EVTYPE)))
 
 # load master event types
 et <- read.delim("Event_Types.txt",header = FALSE,col.names = "EventType")
 et$EventType <- as.factor(toupper(et$EventType))
-#levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),"thunderstorm")
-levels(data_pass2$EVTYPE) <- as.factor(str_trim(unique(c(levels(data_pass2$EVTYPE),levels(et)))))
+#levels(data_pass2$EVTYPE) <- as.factor(str_trim(unique(c(levels(data_pass2$EVTYPE),levels(et)))))
 
-#data_pass2$EVTYPE[grepl("THUNDERSTORM",data_pass2$EVTYPE)]<-as.factor("thunderstorm")
-data_pass2<-droplevels(data_pass2)
+data_pass2<-droplevels(data_pass2) # drop unused levels
+
+# some basic replacements to standardize some terms and misspellings
 levels(data_pass2$EVTYPE) <- gsub("  "," ",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("\\\\","/",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub(" AND ","/",levels(data_pass2$EVTYPE))
@@ -73,9 +83,7 @@ levels(data_pass2$EVTYPE) <- gsub("BLACK ICE","ICY ROADS",levels(data_pass2$EVTY
 levels(data_pass2$EVTYPE) <- gsub("LAKE EFFECT","LAKE-EFFECT",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("LIGHTING","LIGHTNING",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("LIGNTNING","LIGHTNING",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("MUD ","MUD",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("PRECIP$","PRECIPITATION",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("SLIDES","SLIDE",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("SQUALL$","SQUALLS",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("THUDER","THUNDER",levels(data_pass2$EVTYPE))
 levels(data_pass2$EVTYPE) <- gsub("THUNDEER","THUNDER",levels(data_pass2$EVTYPE))
@@ -113,8 +121,8 @@ data_pass2$EVTYPE[grepl("FIRE",data_pass2$EVTYPE)]<-as.factor("WILDFIRE")
 data_pass2$EVTYPE[grepl("WINTRY",data_pass2$EVTYPE)]<-as.factor("WINTER WEATHER")
 data_pass2$EVTYPE[grepl("DAM BREAK",data_pass2$EVTYPE)]<-as.factor("FLASH FLOOD")
 
-data_pass2<-droplevels(data_pass2)
-message("48:: ", length(levels(data_pass2$EVTYPE)))
+data_pass2<-droplevels(data_pass2) # drop unused levels
+message("[Drop 2 ] #Levels :: ", length(levels(data_pass2$EVTYPE)))
 
 # temporarily rename MARINE THUNDERSTORM WIND to mtsw so that we don't lose it
 levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),"mtsw")
@@ -123,7 +131,7 @@ data_pass2$EVTYPE[grepl("MARINE THUNDERSTORM WIND",data_pass2$EVTYPE)]<-as.facto
 # this is specifically NOT a thunderstorm, so rename it
 data_pass2$EVTYPE[grepl("NON[- ]THUNDERSTORM WIND",data_pass2$EVTYPE)]<-as.factor("HIGH WIND")
 
-# some special cases
+# some special cases where the official event doesn't match up exactly
 levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),"HURRICANE (TYPHOON)")
 data_pass2$EVTYPE[grepl("HURRICANE",data_pass2$EVTYPE)]<-as.factor("HURRICANE (TYPHOON)")
 data_pass2$EVTYPE[grepl("THUNDERSTORM",data_pass2$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
@@ -131,16 +139,17 @@ data_pass2$EVTYPE[grepl("THUNDERSTORM",data_pass2$EVTYPE)]<-as.factor("THUNDERST
 # restore MARINE THUNDERSTORM WIND
 data_pass2$EVTYPE[grepl("mtsw",data_pass2$EVTYPE)]<-as.factor("MARINE THUNDERSTORM WIND")
 
+# cycle through the official event list, and rename the recorded events to match
+#   the official one IF the official one is a substring of the recorded event
 for(i in 1:nrow(et)) {
   thisone<-levels(et$EventType)[i]
   levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),thisone)
   data_pass2$EVTYPE[grepl(thisone,data_pass2$EVTYPE)]<-as.factor(thisone)
-
 }
 
-
-data_pass2<-droplevels(data_pass2)
-message("56:: ", length(levels(data_pass2$EVTYPE)))
+data_pass2<-droplevels(data_pass2) # drop unused levels
+message("[Final  ] #Levels :: ", length(levels(data_pass2$EVTYPE)))
+########## FINISH EVENT TYPE MUNGING #########
 
 EVTYPE_TABLE <- data.frame(levels(data_pass2$EVTYPE))
 unmatched<-data.frame(setdiff(data_pass2$EVTYPE, et$EventType))
