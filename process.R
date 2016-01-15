@@ -1,3 +1,4 @@
+starttime <- proc.time()
 data_file_url<-"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 data_file_local<-"storm.data.csv.bz2"
 data_file_dir<-"data/"
@@ -34,14 +35,14 @@ data_pass1a <- data_pass1 %>%
            CROPDMG > 0)
 
 # filter out unmatchable records
-data_pass2 <- data_pass1a %>%
-  filter(!grepl("WET ",EVTYPE))  %>%
-  filter(!grepl("\\?",EVTYPE))  %>%
-  filter(!grepl("APACHE ",EVTYPE))  %>%
-  filter(!grepl("MISHAP",EVTYPE))  %>%
-  filter(!grepl("ACCIDENT",EVTYPE))  %>%
-  filter(!grepl("RECORD ",EVTYPE))
-
+# data_pass2 <- data_pass1a %>%
+#   filter(!grepl("WET ",EVTYPE))  %>%
+#   filter(!grepl("\\?",EVTYPE))  %>%
+#   filter(!grepl("APACHE ",EVTYPE))  %>%
+#   filter(!grepl("MISHAP",EVTYPE))  %>%
+#   filter(!grepl("ACCIDENT",EVTYPE))  %>%
+#   filter(!grepl("RECORD ",EVTYPE))
+data_pass2 <- data_pass1a
 data_pass2a<-data_pass2
 
 ########## START EVENT TYPE MUNGING #########
@@ -148,14 +149,101 @@ for(i in 1:nrow(et)) {
 }
 
 data_pass2<-droplevels(data_pass2) # drop unused levels
-message("[Final  ] #Levels :: ", length(levels(data_pass2$EVTYPE)))
+message("[Drop 3 ] #Levels :: ", length(levels(data_pass2$EVTYPE)))
 ########## FINISH EVENT TYPE MUNGING #########
 
 EVTYPE_TABLE <- data.frame(levels(data_pass2$EVTYPE))
 unmatched<-data.frame(setdiff(data_pass2$EVTYPE, et$EventType))
+names(unmatched)<-c("EVTYPE")
 
+levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),"_ALL_OTHERS")
+for(i in 1:nrow(unmatched)) {
+  thisone<-levels(unmatched$EVTYPE)[i]
+  levels(data_pass2$EVTYPE)[levels(data_pass2$EVTYPE)==thisone] <- "_ALL_OTHERS"
+#  levels(data_pass2$EVTYPE) <- gsub(thisone,"_ALL_OTHERS",levels(data_pass2$EVTYPE))
+}
+data_pass2<-droplevels(data_pass2) # drop unused levels
+message("[Final  ] #Levels :: ", length(levels(data_pass2$EVTYPE)))
+
+#### NEED TO FIX DMG NUMBERS FIRST!
+####
+
+replaceMultiplier <- function(x){
+  #  print(paste("2 x:",x))
+  ret<-0
+  x_num <- suppressWarnings(as.numeric(x))
+  #  print(paste("5 x_num:",x_num))
+  if (is.numeric(x_num) && !(is.na(x_num))) {
+    ret<-10 ** x_num
+    #    print(paste("8 ret:",ret))
+  } else if(x=="H") {
+    ret<-100
+  } else if(x=="K") {
+    ret<-1000
+  } else if(x=="M") {
+    ret<-1000000
+  } else if(x=="B") {
+    ret<-1000000000
+    #    print(paste("17 ret:",ret))
+
+  } else { # anything else is garbage, set to zero so that calculation is zero
+    ret<-0
+  }
+#   ret<-paste(x," -> ",ret)
+#   print(ret)
+  ret
+}
+
+bad.prop<-data_pass2 %>%
+#filter(PROPDMGEXP == "-" | PROPDMGEXP == "+" | PROPDMGEXP == "") %>%
+group_by(PROPDMGEXP) %>%
+  summarize(ps = sum(PROPDMG), pc = n(), pm = mean(PROPDMG))
+
+bad.crop<-data_pass2 %>%
+#  filter(CROPDMGEXP == "-" | CROPDMGEXP == "+" | CROPDMGEXP == "") %>%
+  group_by(CROPDMGEXP) %>%
+  summarize(cs = sum(CROPDMG), cc = n(), cm = mean(CROPDMG))
+
+data_pass3 <- data_pass2
+# %>%
+#   mutate(PROPMULT=as.character(PROPDMGEXP), CROPMULT=as.character(CROPDMGEXP))
+#
+data_pass3$PROPMULT<-
+  sapply(as.character(data_pass3$PROPDMGEXP), FUN=replaceMultiplier)
+#data_pass3$PROPMULT<-replaceMultiplier(data_pass3$PROPDMGEXP)
+ # sapply(as.character(data_pass3$PROPDMGEXP), FUN=replaceMultiplier)
+data_pass3$PROPVAL<-data_pass3$PROPDMG * data_pass3$PROPMULT
+
+#data_pass3$CROPMULT<-replaceMultiplier(data_pass3$CROPDMGEXP)
+
+data_pass3$CROPMULT<-
+  sapply(as.character(data_pass3$CROPDMGEXP), FUN=replaceMultiplier)
+data_pass3$CROPVAL<-data_pass3$CROPDMG * data_pass3$CROPMULT
+
+#
+# levels(data_pass3$PROPMULT) = c(levels(data_pass3$PROPMULT),100)
+# data_pass3$PROPMULT[data_pass2$PROPDMGEXP=="H"]<-as.factor(100)
+#
+# data_pass3$PROPMULT[data_pass2$PROPDMGEXP=="H"]<-as.factor(100)
+
+#sapply(data_pass3$PROPMULT,FUN = replaceMultiplier)
+
+# crunch it up
+data_crunch <- data_pass3 %>%
+group_by(EVTYPE) %>%
+summarise(sumF=sum(FATALITIES),
+          sumI=sum(INJURIES),
+          sumP=sum(PROPVAL),
+          sumC=sum(CROPVAL),
+          meanF=round(mean(FATALITIES),3),
+          meanI=round(mean(INJURIES),3),
+          meanP=round(mean(PROPVAL),3),
+          meanC=round(mean(CROPVAL),3))
 
 # Population health = FATALITIES, INJURIES
 
 # economic consequences: PROPDMG, CROPDMG hold dollar amount, PROPDMGEXP, CROPDMGEXP
 # hold character showing magnitude of PROPDMG/CROPDMG (i.e. "B","H")
+
+# output proc time
+print(proc.time() - starttime)
