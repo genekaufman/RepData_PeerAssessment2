@@ -185,12 +185,15 @@ message("[MUNGE FINAL ] #Levels :: ", length(levels(data_munged$EVTYPE)))
 replaceMultiplier <- function(x){
   # this function will convert the code given in PROPDMGEXP and CROPDMGEXP to the
   #   full multiplier that it represents
-  #   A numeric field is an exponent of 10, while H,K,M,B represent Hundred, Thousand,
-  #   Million and Billion. Anything else cannot be interpreted, so we'll set it to 0
+  # Per analysis by github user 'flyingdisc'
+  #   https://github.com/flyingdisc/RepData_PeerAssessment2/blob/master/how-to-handle-PROPDMGEXP.md
+  #   A numeric field is 10, while H,K,M,B represent Hundred, Thousand,
+  #   Million and Billion. '+' is 1. Anything else cannot be interpreted, so we'll set it to 0
   x_num <- suppressWarnings(as.numeric(x))
   if (is.numeric(x_num) && !(is.na(x_num))) {
-    ret<-10 ** x_num
-    #    print(paste("8 ret:",ret))
+    ret<-10 
+  } else if(x=="+") {
+    ret<-1
   } else if(x=="H") {
     ret<-100
   } else if(x=="K") {
