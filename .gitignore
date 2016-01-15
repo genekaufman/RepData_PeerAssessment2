@@ -1,2 +1,3 @@
 ./data/*.bz2
 *.bz2
+./Project2_cache/*
