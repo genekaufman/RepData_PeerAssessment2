@@ -10,7 +10,7 @@
 
 <meta name="author" content="Gene Kaufman" />
 
-<meta name="date" content="2016-01-12" />
+<meta name="date" content="2016-01-15" />
 
 <title>Rep Data Project 2 (BETTER TITLE NEEDED)</title>
 
@@ -64,19 +64,167 @@ img {
 <div id="header">
 <h1 class="title">Rep Data Project 2 (BETTER TITLE NEEDED)</h1>
 <h4 class="author"><em>Gene Kaufman</em></h4>
-<h4 class="date"><em>January 12, 2016</em></h4>
+<h4 class="date"><em>January 15, 2016</em></h4>
 </div>
 
 
-<div id="synopsis" class="section level2">
-<h2>Synopsis</h2>
+<div id="synopsis" class="section level1">
+<h1>Synopsis</h1>
 <p>Synopsis: Immediately after the title, there should be a synopsis which describes and summarizes your analysis in at most 10 complete sentences.</p>
 </div>
-<div id="data-processing" class="section level2">
-<h2>Data Processing</h2>
+<div id="data-processing" class="section level1">
+<h1>Data Processing</h1>
+<p>First, load some libraries and set some options</p>
+<pre class="r"><code>require(knitr)
+opts_chunk$set(echo=TRUE, results=&quot;asis&quot;, warning=FALSE, message=FALSE)
+
+library(dplyr)
+library(stringr)</code></pre>
+<p>Load the file into a data frame</p>
+<pre class="r"><code>##### DATA PROCESSING ####
+#### Retrieve and load data ####
+data_file_url&lt;-&quot;https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2&quot;
+data_file_local&lt;-&quot;storm.data.csv.bz2&quot;
+data_file_dir&lt;-&quot;data/&quot;
+if (!dir.exists(data_file_dir)) {
+  dir.create(data_file_dir)
+}
+data_file_path&lt;-paste0(data_file_dir,data_file_local)
+if (!file.exists(data_file_path)) {
+  download.file(data_file_url,data_file_path,mode = &quot;wb&quot;)
+}
+# no need to unzip it - bz2 files can be read directly by read.csv and read.table
+if (!exists(&quot;data_raw&quot;)) {
+  data_raw &lt;- read.csv(data_file_path)
+}</code></pre>
+<div id="prep-data-for-analysis" class="section level3">
+<h3>Prep Data for Analysis</h3>
+<p>Many entries for <strong>EVTYPE</strong>, <strong>PROPDMGEXP</strong> and <strong>CROPDMGEXP</strong> are duplicated with different cases, set all to upper case</p>
+<pre class="r"><code>data_raw$EVTYPE &lt;- as.factor(toupper(data_raw$EVTYPE))
+data_raw$PROPDMGEXP &lt;- as.factor(toupper(data_raw$PROPDMGEXP))
+data_raw$CROPDMGEXP &lt;- as.factor(toupper(data_raw$CROPDMGEXP))</code></pre>
+<p>First, remove all fields, keeping only the ones that we’ll need<br />Population health:<br />- <strong>FATALITIES</strong>, <strong>INJURIES</strong><br />Economic consequences:<br />- <strong>PROPDMG</strong>, <strong>CROPDMG</strong> hold dollar amount<br />- <strong>PROPDMGEXP</strong>, <strong>CROPDMGEXP</strong> hold character showing magnitude of PROPDMG/CROPDMG (i.e. “B”,“H”)</p>
+<pre class="r"><code>wanted_fields &lt;- c(&quot;BGN_DATE&quot;,&quot;STATE&quot;,&quot;EVTYPE&quot;,&quot;FATALITIES&quot;,&quot;INJURIES&quot;,
+                   &quot;PROPDMG&quot;,&quot;PROPDMGEXP&quot;,&quot;CROPDMG&quot;,&quot;CROPDMGEXP&quot;)
+data_raw_selected &lt;- data_raw %&gt;%
+  select(one_of(wanted_fields))</code></pre>
+<p>Filter out records that have at least 1 FATALITY, 1 INJURY, or at least $1 Property or Crop damage</p>
+<pre class="r"><code>data_filtered &lt;- data_raw_selected %&gt;%
+  filter(FATALITIES &gt; 0 |
+           INJURIES &gt; 0 |
+           PROPDMG &gt; 0 |
+           CROPDMG &gt; 0)
+
+# data_munged will hold the data as we're reducing the event types
+data_munged &lt;- data_filtered</code></pre>
+<p>Fix a data error in one record - this one was is mentioned in the record comments to be $115M, not $115B<br />Credit: Robert Carman in the <a href="Class%20Discussion%20forums"><a href="https://www.coursera.org/learn/reproducible-research/discussions/DrCe_bl7EeWjxw7W9fJX5Q" class="uri">https://www.coursera.org/learn/reproducible-research/discussions/DrCe_bl7EeWjxw7W9fJX5Q</a></a></p>
+<pre class="r"><code>data_munged$PROPDMGEXP[data_munged$PROPDMGEXP == 'B' &amp; data_munged$BGN_DATE == '1/1/2006 0:00:00']&lt;- as.factor(&quot;M&quot;)</code></pre>
+</div>
+<div id="data-munging-event-type" class="section level2">
+<h2>Data Munging: Event Type</h2>
+<p><strong>Strategy to clean up messy event types:</strong><br />1. Attempt to reduce number of distinct events by removing non-letters, clean up spacing, expand abbreviations and fix obvious misspellings<br />2. Explicitly replace events that are mentioned in the NWS documentation as being counted as another event<br />3. Loop through official event list, replacing record events if the official event is a substring of the recorded event (e.g. “TORNADO F1” -&gt; “TORNADO”)</p>
+<pre class="r"><code># some basic replacements to standardize some terms and misspellings
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;  &quot;,&quot; &quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;\\\\&quot;,&quot;/&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot; AND &quot;,&quot;/&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot; FLD$&quot;,&quot;&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;/ &quot;,&quot;/&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;//&quot;,&quot;/&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;/SML&quot;,&quot;/SMALL&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;/SMALL&quot;,&quot; SMALL&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;AVALANCE&quot;,&quot;AVALANCHE&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;COASTALSTORM&quot;,&quot;COASTAL STORM&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;HVY&quot;,&quot;HEAVY&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;ICE ON ROAD&quot;,&quot;ICY ROADS&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;ICE ROADS&quot;,&quot;ICY ROADS&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;BLACK ICE&quot;,&quot;ICY ROADS&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;LAKE EFFECT&quot;,&quot;LAKE-EFFECT&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;LIGHTING&quot;,&quot;LIGHTNING&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;LIGNTNING&quot;,&quot;LIGHTNING&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;PRECIP$&quot;,&quot;PRECIPITATION&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;SQUALL$&quot;,&quot;SQUALLS&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;THUDER&quot;,&quot;THUNDER&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;THUNDEER&quot;,&quot;THUNDER&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;THUNDERE&quot;,&quot;THUNDER&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;THUNDERT&quot;,&quot;THUNDERS&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;THUNER&quot;,&quot;THUNDER&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;THUNDERTSORM&quot;,&quot;THUNDERSTORM&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;THUNDERSORM&quot;,&quot;THUNDERSTORM&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;TORNDAO&quot;,&quot;TORNADO&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;TROM&quot;,&quot;TORM&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;TSTM&quot;,&quot;THUNDERSTORM&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;TUNDER&quot;,&quot;THUNDER&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;UNSEASONABLE&quot;,&quot;UNSEASONABLY&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;WINDCHILL&quot;,&quot;WIND CHILL&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;WINDS&quot;,&quot;WIND&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;COLD/WIND&quot;,&quot;COLD/WIND CHILL&quot;,levels(data_munged$EVTYPE))
+
+# Special case - explicitly renamed in NWSI 10-1605
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;LANDSLIDE&quot;,&quot;DEBRIS FLOW&quot;,levels(data_munged$EVTYPE))
+
+# Special cases - explicitly mentioned in event type description in NWSI 10-1605
+data_munged$EVTYPE[grepl(&quot;HYPOTHERMIA&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;COLD/WIND CHILL&quot;)
+data_munged$EVTYPE[grepl(&quot;SLIDE&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;DEBRIS FLOW&quot;)
+data_munged$EVTYPE[grepl(&quot;FREEZE&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;FROST/FREEZE&quot;)
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;ASTRONOMICAL HIGH TIDE&quot;,&quot;STORM SURGE/TIDE&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;HIGH TIDES&quot;,&quot;STORM SURGE/TIDE&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;STORM SURGE&quot;,&quot;STORM SURGE/TIDE&quot;,levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;BEACH EROSION&quot;,&quot;HIGH SURF&quot;,levels(data_munged$EVTYPE))
+data_munged$EVTYPE[grepl(&quot;SURF&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;HIGH SURF&quot;)
+levels(data_munged$EVTYPE) &lt;- gsub(&quot;DROWNING&quot;,&quot;RIP CURRENT&quot;,levels(data_munged$EVTYPE))
+data_munged$EVTYPE[grepl(&quot;BURST&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;THUNDERSTORM WIND&quot;)
+data_munged$EVTYPE[grepl(&quot;GUSTNADO&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;THUNDERSTORM WIND&quot;)
+data_munged$EVTYPE[grepl(&quot;LANDSPOUT&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;TORNADO&quot;)
+data_munged$EVTYPE[grepl(&quot;FIRE&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;WILDFIRE&quot;)
+data_munged$EVTYPE[grepl(&quot;WINTRY&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;WINTER WEATHER&quot;)
+data_munged$EVTYPE[grepl(&quot;DAM BREAK&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;FLASH FLOOD&quot;)
+
+# temporarily rename MARINE THUNDERSTORM WIND to mtsw so that we don't lose it when
+#   we replace THUNDERSTORM in a later step
+levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),&quot;mtsw&quot;)
+data_munged$EVTYPE[grepl(&quot;MARINE THUNDERSTORM WIND&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;mtsw&quot;)
+
+# this is specifically NOT a thunderstorm, so rename it
+data_munged$EVTYPE[grepl(&quot;NON[- ]THUNDERSTORM WIND&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;HIGH WIND&quot;)
+
+# some special cases where the official event doesn't match up exactly
+levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),&quot;HURRICANE (TYPHOON)&quot;)
+data_munged$EVTYPE[grepl(&quot;HURRICANE&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;HURRICANE (TYPHOON)&quot;)
+data_munged$EVTYPE[grepl(&quot;THUNDERSTORM&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;THUNDERSTORM WIND&quot;)
+
+# restore MARINE THUNDERSTORM WIND
+data_munged$EVTYPE[grepl(&quot;mtsw&quot;,data_munged$EVTYPE)]&lt;-as.factor(&quot;MARINE THUNDERSTORM WIND&quot;)
+
+# load master event types
+#   Event_Types.txt is a distinct list of Official Events manually pulled out of
+#     NWSI 10-1605 8/17/2007, Section 2.1.1
+#   https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf
+event_type_official &lt;- read.delim(&quot;Event_Types.txt&quot;,header = FALSE,col.names = &quot;EventType&quot;)
+event_type_official$EventType &lt;- as.factor(toupper(event_type_official$EventType))
+
+# cycle through the official event list, and rename the recorded events to match
+#   the official one IF the official one is a substring of the recorded event
+for(i in 1:nrow(event_type_official)) {
+  thisone&lt;-levels(event_type_official$EventType)[i]
+  levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),thisone)
+  data_munged$EVTYPE[grepl(thisone,data_munged$EVTYPE)]&lt;-as.factor(thisone)
+}
+
+# now we need take all of the Event Types that didn't map to an official event
+#   and combine them into a single event name &quot;_ALL_OTHERS&quot;, so that we can
+#   gauge the impact of the unmatched data
+unmatched&lt;-data.frame(setdiff(data_munged$EVTYPE, event_type_official$EventType))
+names(unmatched)&lt;-c(&quot;EVTYPE&quot;)
+
+levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),&quot;_ALL_OTHERS&quot;)
+for(i in 1:nrow(unmatched)) {
+  thisone&lt;-levels(unmatched$EVTYPE)[i]
+  levels(data_munged$EVTYPE)[levels(data_munged$EVTYPE)==thisone] &lt;- &quot;_ALL_OTHERS&quot;
+}</code></pre>
 </div>
 <div id="results" class="section level2">
 <h2>Results</h2>
+</div>
 </div>
 
 
