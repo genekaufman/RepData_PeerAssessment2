@@ -30,3 +30,7 @@ names(mydf)<-c("myvar")
 #print(replaceMultiplier("B"))
 mydf$newvar<-
   sapply(as.character(mydf$myvar), FUN=replaceMultiplier)
+
+cleanAllButDR <- function(){
+  rm(list=ls()[ls()!="data_raw" & ls()!="cleacleanAllButDR"])
+}

@@ -23,27 +23,24 @@ data_raw$CROPDMGEXP <- as.factor(toupper(data_raw$CROPDMGEXP))
 # first, remove all fields, keeping only the ones that we'll need
 wanted_fields <- c("BGN_DATE","STATE","EVTYPE","FATALITIES","INJURIES",
                    "PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")
-data_pass1 <- data_raw %>%
+data_raw_wanted_fields <- data_raw %>%
   select(one_of(wanted_fields))
 
 # first pass - filter out records that have at least 1 FATALITY, 1 INJURY,
 # or at least $1 Property or Crop damage
-data_pass1a <- data_pass1 %>%
+data_filtered <- data_raw_wanted_fields %>%
   filter(FATALITIES > 0 |
            INJURIES > 0 |
            PROPDMG > 0 |
            CROPDMG > 0)
 
-# filter out unmatchable records
-# data_pass2 <- data_pass1a %>%
-#   filter(!grepl("WET ",EVTYPE))  %>%
-#   filter(!grepl("\\?",EVTYPE))  %>%
-#   filter(!grepl("APACHE ",EVTYPE))  %>%
-#   filter(!grepl("MISHAP",EVTYPE))  %>%
-#   filter(!grepl("ACCIDENT",EVTYPE))  %>%
-#   filter(!grepl("RECORD ",EVTYPE))
-data_pass2 <- data_pass1a
-data_pass2a<-data_pass2
+data_munged <- data_filtered
+
+## Fix a data error in one record - this one was verified independently to be $115M, not $115B
+## Credit: Robert Carman,
+##  Class Discussion forums: https://www.coursera.org/learn/reproducible-research/discussions/DrCe_bl7EeWjxw7W9fJX5Q
+data_munged$PROPDMGEXP[data_munged$PROPDMGEXP == 'B' & data_munged$BGN_DATE == '1/1/2006 0:00:00']<- as.factor("M")
+
 
 ########## START EVENT TYPE MUNGING #########
 # Strategy to clean up messy event types:
@@ -55,124 +52,122 @@ data_pass2a<-data_pass2
 # 4. Loop through official event list, replacing record events if the official
 #     event is a substring of the recorded event (e.g. "TORNADO F1" -> "TORNADO")
 
-message("[Initial] #Levels :: ", length(levels(data_pass2$EVTYPE)))
-data_pass2<-droplevels(data_pass2) # drop unused levels
-message("[Drop 1 ] #Levels :: ", length(levels(data_pass2$EVTYPE)))
+message("[Initial] #Levels :: ", length(levels(data_munged$EVTYPE)))
+data_munged<-droplevels(data_munged) # drop unused levels
+message("[Drop 1 ] #Levels :: ", length(levels(data_munged$EVTYPE)))
 
 # load master event types
 et <- read.delim("Event_Types.txt",header = FALSE,col.names = "EventType")
 et$EventType <- as.factor(toupper(et$EventType))
-#levels(data_pass2$EVTYPE) <- as.factor(str_trim(unique(c(levels(data_pass2$EVTYPE),levels(et)))))
 
-data_pass2<-droplevels(data_pass2) # drop unused levels
+data_munged<-droplevels(data_munged) # drop unused levels
 
 # some basic replacements to standardize some terms and misspellings
-levels(data_pass2$EVTYPE) <- gsub("  "," ",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("\\\\","/",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub(" AND ","/",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub(" FLD$","",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("/ ","/",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("//","/",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("/SML","/SMALL",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("/SMALL"," SMALL",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("AVALANCE","AVALANCHE",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("COASTALSTORM","COASTAL STORM",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("HVY","HEAVY",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("ICE ON ROAD","ICY ROADS",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("ICE ROADS","ICY ROADS",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("BLACK ICE","ICY ROADS",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("LAKE EFFECT","LAKE-EFFECT",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("LIGHTING","LIGHTNING",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("LIGNTNING","LIGHTNING",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("PRECIP$","PRECIPITATION",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("SQUALL$","SQUALLS",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUDER","THUNDER",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUNDEER","THUNDER",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUNDERE","THUNDER",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUNDERT","THUNDERS",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUNER","THUNDER",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUNDERTSORM","THUNDERSTORM",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("THUNDERSORM","THUNDERSTORM",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("TORNDAO","TORNADO",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("TROM","TORM",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("TSTM","THUNDERSTORM",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("TUNDER","THUNDER",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("UNSEASONABLE","UNSEASONABLY",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("WINDCHILL","WIND CHILL",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("WINDS","WIND",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("COLD/WIND","COLD/WIND CHILL",levels(data_pass2$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("  "," ",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("\\\\","/",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub(" AND ","/",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub(" FLD$","",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("/ ","/",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("//","/",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("/SML","/SMALL",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("/SMALL"," SMALL",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("AVALANCE","AVALANCHE",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("COASTALSTORM","COASTAL STORM",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("HVY","HEAVY",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("ICE ON ROAD","ICY ROADS",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("ICE ROADS","ICY ROADS",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("BLACK ICE","ICY ROADS",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("LAKE EFFECT","LAKE-EFFECT",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("LIGHTING","LIGHTNING",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("LIGNTNING","LIGHTNING",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("PRECIP$","PRECIPITATION",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("SQUALL$","SQUALLS",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("THUDER","THUNDER",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("THUNDEER","THUNDER",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("THUNDERE","THUNDER",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("THUNDERT","THUNDERS",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("THUNER","THUNDER",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("THUNDERTSORM","THUNDERSTORM",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("THUNDERSORM","THUNDERSTORM",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("TORNDAO","TORNADO",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("TROM","TORM",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("TSTM","THUNDERSTORM",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("TUNDER","THUNDER",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("UNSEASONABLE","UNSEASONABLY",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("WINDCHILL","WIND CHILL",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("WINDS","WIND",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("COLD/WIND","COLD/WIND CHILL",levels(data_munged$EVTYPE))
 
 # Special case - explicitly renamed in NWS documentation
-levels(data_pass2$EVTYPE) <- gsub("LANDSLIDE","DEBRIS FLOW",levels(data_pass2$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("LANDSLIDE","DEBRIS FLOW",levels(data_munged$EVTYPE))
 
 # Special cases - explicitly mentioned in event type description in NWS documentation
-data_pass2$EVTYPE[grepl("HYPOTHERMIA",data_pass2$EVTYPE)]<-as.factor("COLD/WIND CHILL")
-data_pass2$EVTYPE[grepl("SLIDE",data_pass2$EVTYPE)]<-as.factor("DEBRIS FLOW")
-data_pass2$EVTYPE[grepl("FREEZE",data_pass2$EVTYPE)]<-as.factor("FROST/FREEZE")
-levels(data_pass2$EVTYPE) <- gsub("ASTRONOMICAL HIGH TIDE","STORM SURGE/TIDE",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("HIGH TIDES","STORM SURGE/TIDE",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("STORM SURGE","STORM SURGE/TIDE",levels(data_pass2$EVTYPE))
-levels(data_pass2$EVTYPE) <- gsub("BEACH EROSION","HIGH SURF",levels(data_pass2$EVTYPE))
-data_pass2$EVTYPE[grepl("SURF",data_pass2$EVTYPE)]<-as.factor("HIGH SURF")
-levels(data_pass2$EVTYPE) <- gsub("DROWNING","RIP CURRENT",levels(data_pass2$EVTYPE))
-data_pass2$EVTYPE[grepl("BURST",data_pass2$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
-data_pass2$EVTYPE[grepl("GUSTNADO",data_pass2$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
-data_pass2$EVTYPE[grepl("LANDSPOUT",data_pass2$EVTYPE)]<-as.factor("TORNADO")
-data_pass2$EVTYPE[grepl("FIRE",data_pass2$EVTYPE)]<-as.factor("WILDFIRE")
-data_pass2$EVTYPE[grepl("WINTRY",data_pass2$EVTYPE)]<-as.factor("WINTER WEATHER")
-data_pass2$EVTYPE[grepl("DAM BREAK",data_pass2$EVTYPE)]<-as.factor("FLASH FLOOD")
+data_munged$EVTYPE[grepl("HYPOTHERMIA",data_munged$EVTYPE)]<-as.factor("COLD/WIND CHILL")
+data_munged$EVTYPE[grepl("SLIDE",data_munged$EVTYPE)]<-as.factor("DEBRIS FLOW")
+data_munged$EVTYPE[grepl("FREEZE",data_munged$EVTYPE)]<-as.factor("FROST/FREEZE")
+levels(data_munged$EVTYPE) <- gsub("ASTRONOMICAL HIGH TIDE","STORM SURGE/TIDE",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("HIGH TIDES","STORM SURGE/TIDE",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("STORM SURGE","STORM SURGE/TIDE",levels(data_munged$EVTYPE))
+levels(data_munged$EVTYPE) <- gsub("BEACH EROSION","HIGH SURF",levels(data_munged$EVTYPE))
+data_munged$EVTYPE[grepl("SURF",data_munged$EVTYPE)]<-as.factor("HIGH SURF")
+levels(data_munged$EVTYPE) <- gsub("DROWNING","RIP CURRENT",levels(data_munged$EVTYPE))
+data_munged$EVTYPE[grepl("BURST",data_munged$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
+data_munged$EVTYPE[grepl("GUSTNADO",data_munged$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
+data_munged$EVTYPE[grepl("LANDSPOUT",data_munged$EVTYPE)]<-as.factor("TORNADO")
+data_munged$EVTYPE[grepl("FIRE",data_munged$EVTYPE)]<-as.factor("WILDFIRE")
+data_munged$EVTYPE[grepl("WINTRY",data_munged$EVTYPE)]<-as.factor("WINTER WEATHER")
+data_munged$EVTYPE[grepl("DAM BREAK",data_munged$EVTYPE)]<-as.factor("FLASH FLOOD")
 
-data_pass2<-droplevels(data_pass2) # drop unused levels
-message("[Drop 2 ] #Levels :: ", length(levels(data_pass2$EVTYPE)))
+data_munged<-droplevels(data_munged) # drop unused levels
+message("[Drop 2 ] #Levels :: ", length(levels(data_munged$EVTYPE)))
 
 # temporarily rename MARINE THUNDERSTORM WIND to mtsw so that we don't lose it
-levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),"mtsw")
-data_pass2$EVTYPE[grepl("MARINE THUNDERSTORM WIND",data_pass2$EVTYPE)]<-as.factor("mtsw")
+levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),"mtsw")
+data_munged$EVTYPE[grepl("MARINE THUNDERSTORM WIND",data_munged$EVTYPE)]<-as.factor("mtsw")
 
 # this is specifically NOT a thunderstorm, so rename it
-data_pass2$EVTYPE[grepl("NON[- ]THUNDERSTORM WIND",data_pass2$EVTYPE)]<-as.factor("HIGH WIND")
+data_munged$EVTYPE[grepl("NON[- ]THUNDERSTORM WIND",data_munged$EVTYPE)]<-as.factor("HIGH WIND")
 
 # some special cases where the official event doesn't match up exactly
-levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),"HURRICANE (TYPHOON)")
-data_pass2$EVTYPE[grepl("HURRICANE",data_pass2$EVTYPE)]<-as.factor("HURRICANE (TYPHOON)")
-data_pass2$EVTYPE[grepl("THUNDERSTORM",data_pass2$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
+levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),"HURRICANE (TYPHOON)")
+data_munged$EVTYPE[grepl("HURRICANE",data_munged$EVTYPE)]<-as.factor("HURRICANE (TYPHOON)")
+data_munged$EVTYPE[grepl("THUNDERSTORM",data_munged$EVTYPE)]<-as.factor("THUNDERSTORM WIND")
 
 # restore MARINE THUNDERSTORM WIND
-data_pass2$EVTYPE[grepl("mtsw",data_pass2$EVTYPE)]<-as.factor("MARINE THUNDERSTORM WIND")
+data_munged$EVTYPE[grepl("mtsw",data_munged$EVTYPE)]<-as.factor("MARINE THUNDERSTORM WIND")
 
 # cycle through the official event list, and rename the recorded events to match
 #   the official one IF the official one is a substring of the recorded event
 for(i in 1:nrow(et)) {
   thisone<-levels(et$EventType)[i]
-  levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),thisone)
-  data_pass2$EVTYPE[grepl(thisone,data_pass2$EVTYPE)]<-as.factor(thisone)
+  levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),thisone)
+  data_munged$EVTYPE[grepl(thisone,data_munged$EVTYPE)]<-as.factor(thisone)
 }
 
-data_pass2<-droplevels(data_pass2) # drop unused levels
-message("[Drop 3 ] #Levels :: ", length(levels(data_pass2$EVTYPE)))
+data_munged<-droplevels(data_munged) # drop unused levels
+message("[Drop 3 ] #Levels :: ", length(levels(data_munged$EVTYPE)))
 ########## FINISH EVENT TYPE MUNGING #########
 
-EVTYPE_TABLE <- data.frame(levels(data_pass2$EVTYPE))
-unmatched<-data.frame(setdiff(data_pass2$EVTYPE, et$EventType))
+EVTYPE_TABLE <- data.frame(levels(data_munged$EVTYPE))
+unmatched<-data.frame(setdiff(data_munged$EVTYPE, et$EventType))
 names(unmatched)<-c("EVTYPE")
 
-levels(data_pass2$EVTYPE) = c(levels(data_pass2$EVTYPE),"_ALL_OTHERS")
+levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),"_ALL_OTHERS")
 for(i in 1:nrow(unmatched)) {
   thisone<-levels(unmatched$EVTYPE)[i]
-  levels(data_pass2$EVTYPE)[levels(data_pass2$EVTYPE)==thisone] <- "_ALL_OTHERS"
-#  levels(data_pass2$EVTYPE) <- gsub(thisone,"_ALL_OTHERS",levels(data_pass2$EVTYPE))
+  levels(data_munged$EVTYPE)[levels(data_munged$EVTYPE)==thisone] <- "_ALL_OTHERS"
+#  levels(data_munged$EVTYPE) <- gsub(thisone,"_ALL_OTHERS",levels(data_munged$EVTYPE))
 }
-data_pass2<-droplevels(data_pass2) # drop unused levels
-message("[Final  ] #Levels :: ", length(levels(data_pass2$EVTYPE)))
+data_munged<-droplevels(data_munged) # drop unused levels
+message("[Final  ] #Levels :: ", length(levels(data_munged$EVTYPE)))
 
-#### NEED TO FIX DMG NUMBERS FIRST!
 ####
-
 replaceMultiplier <- function(x){
-  #  print(paste("2 x:",x))
-  ret<-0
+  # this function will convert the code given in PROPDMGEXP and CROPDMGEXP to the
+  #   full multiplier that it represents
+  #   A numeric field is an exponent of 10, while H,K,M,B represent Hundred, Thousand,
+  #   Million and Billion. Anything else cannot be interpreted, so we'll set it to 0
   x_num <- suppressWarnings(as.numeric(x))
-  #  print(paste("5 x_num:",x_num))
   if (is.numeric(x_num) && !(is.na(x_num))) {
     ret<-10 ** x_num
     #    print(paste("8 ret:",ret))
@@ -184,49 +179,22 @@ replaceMultiplier <- function(x){
     ret<-1000000
   } else if(x=="B") {
     ret<-1000000000
-    #    print(paste("17 ret:",ret))
-
   } else { # anything else is garbage, set to zero so that calculation is zero
     ret<-0
   }
-#   ret<-paste(x," -> ",ret)
-#   print(ret)
   ret
 }
 
-bad.prop<-data_pass2 %>%
-#filter(PROPDMGEXP == "-" | PROPDMGEXP == "+" | PROPDMGEXP == "") %>%
-group_by(PROPDMGEXP) %>%
-  summarize(ps = sum(PROPDMG), pc = n(), pm = mean(PROPDMG))
+data_pass3 <- data_munged
 
-bad.crop<-data_pass2 %>%
-#  filter(CROPDMGEXP == "-" | CROPDMGEXP == "+" | CROPDMGEXP == "") %>%
-  group_by(CROPDMGEXP) %>%
-  summarize(cs = sum(CROPDMG), cc = n(), cm = mean(CROPDMG))
-
-data_pass3 <- data_pass2
-# %>%
-#   mutate(PROPMULT=as.character(PROPDMGEXP), CROPMULT=as.character(CROPDMGEXP))
-#
 data_pass3$PROPMULT<-
   sapply(as.character(data_pass3$PROPDMGEXP), FUN=replaceMultiplier)
-#data_pass3$PROPMULT<-replaceMultiplier(data_pass3$PROPDMGEXP)
- # sapply(as.character(data_pass3$PROPDMGEXP), FUN=replaceMultiplier)
 data_pass3$PROPVAL<-data_pass3$PROPDMG * data_pass3$PROPMULT
-
-#data_pass3$CROPMULT<-replaceMultiplier(data_pass3$CROPDMGEXP)
 
 data_pass3$CROPMULT<-
   sapply(as.character(data_pass3$CROPDMGEXP), FUN=replaceMultiplier)
 data_pass3$CROPVAL<-data_pass3$CROPDMG * data_pass3$CROPMULT
 
-#
-# levels(data_pass3$PROPMULT) = c(levels(data_pass3$PROPMULT),100)
-# data_pass3$PROPMULT[data_pass2$PROPDMGEXP=="H"]<-as.factor(100)
-#
-# data_pass3$PROPMULT[data_pass2$PROPDMGEXP=="H"]<-as.factor(100)
-
-#sapply(data_pass3$PROPMULT,FUN = replaceMultiplier)
 
 # crunch it up
 data_crunch <- data_pass3 %>%
@@ -247,3 +215,7 @@ summarise(sumF=sum(FATALITIES),
 
 # output proc time
 print(proc.time() - starttime)
+
+cleanAllButDR <- function(){
+  rm(list=ls()[ls()!="data_raw" & ls()!="cleacleanAllButDR"])
+}
