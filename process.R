@@ -1,4 +1,9 @@
 starttime <- proc.time()
+library(dplyr)
+library(stringr)
+
+##### DATA PROCESSING ####
+#### Retrieve and load data ####
 data_file_url<-"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 data_file_local<-"storm.data.csv.bz2"
 data_file_dir<-"data/"
@@ -13,27 +18,35 @@ if (!file.exists(data_file_path)) {
 if (!exists("data_raw")) {
   data_raw <- read.csv(data_file_path)
 }
-library(dplyr)
-library(stringr)
+
+#### Prep Data for Analysis ####
 # Many entries for EVTYPE, PROPDMGEXP and CROPDMGEXP are duplicated with different cases, set all to upper case
 data_raw$EVTYPE <- as.factor(toupper(data_raw$EVTYPE))
 data_raw$PROPDMGEXP <- as.factor(toupper(data_raw$PROPDMGEXP))
 data_raw$CROPDMGEXP <- as.factor(toupper(data_raw$CROPDMGEXP))
 
 # first, remove all fields, keeping only the ones that we'll need
+# Population health:
+#   FATALITIES, INJURIES
+# economic consequences:
+#   PROPDMG, CROPDMG hold dollar amount
+#   PROPDMGEXP, CROPDMGEXP hold character showing magnitude of PROPDMG/CROPDMG
+#   (i.e. "B","H")
+
 wanted_fields <- c("BGN_DATE","STATE","EVTYPE","FATALITIES","INJURIES",
                    "PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")
-data_raw_wanted_fields <- data_raw %>%
+data_raw_selected <- data_raw %>%
   select(one_of(wanted_fields))
 
 # first pass - filter out records that have at least 1 FATALITY, 1 INJURY,
 # or at least $1 Property or Crop damage
-data_filtered <- data_raw_wanted_fields %>%
+data_filtered <- data_raw_selected %>%
   filter(FATALITIES > 0 |
            INJURIES > 0 |
            PROPDMG > 0 |
            CROPDMG > 0)
 
+# data_munged will hold the data as we're reducing the event types
 data_munged <- data_filtered
 
 ## Fix a data error in one record - this one was verified independently to be $115M, not $115B
@@ -41,26 +54,18 @@ data_munged <- data_filtered
 ##  Class Discussion forums: https://www.coursera.org/learn/reproducible-research/discussions/DrCe_bl7EeWjxw7W9fJX5Q
 data_munged$PROPDMGEXP[data_munged$PROPDMGEXP == 'B' & data_munged$BGN_DATE == '1/1/2006 0:00:00']<- as.factor("M")
 
-
 ########## START EVENT TYPE MUNGING #########
 # Strategy to clean up messy event types:
-# 1. Records with events that cannot be matched at all will be ignored
-# 2. Attempt to reduce number of distinct events by removing non-letters,
+# 1. Attempt to reduce number of distinct events by removing non-letters,
 #     clean up spacing, expand abbreviations and fix obvious misspellings
-# 3. Explicitly replace events that are mentioned in the NWS documentation
+# 2. Explicitly replace events that are mentioned in the NWS documentation
 #     as being counted as another event
-# 4. Loop through official event list, replacing record events if the official
+# 3. Loop through official event list, replacing record events if the official
 #     event is a substring of the recorded event (e.g. "TORNADO F1" -> "TORNADO")
 
-message("[Initial] #Levels :: ", length(levels(data_munged$EVTYPE)))
+message("[MUNGE START ] #Levels :: ", length(levels(data_munged$EVTYPE)))
 data_munged<-droplevels(data_munged) # drop unused levels
-message("[Drop 1 ] #Levels :: ", length(levels(data_munged$EVTYPE)))
-
-# load master event types
-et <- read.delim("Event_Types.txt",header = FALSE,col.names = "EventType")
-et$EventType <- as.factor(toupper(et$EventType))
-
-data_munged<-droplevels(data_munged) # drop unused levels
+message("[MUNGE Drop 1] #Levels :: ", length(levels(data_munged$EVTYPE)))
 
 # some basic replacements to standardize some terms and misspellings
 levels(data_munged$EVTYPE) <- gsub("  "," ",levels(data_munged$EVTYPE))
@@ -98,10 +103,10 @@ levels(data_munged$EVTYPE) <- gsub("WINDCHILL","WIND CHILL",levels(data_munged$E
 levels(data_munged$EVTYPE) <- gsub("WINDS","WIND",levels(data_munged$EVTYPE))
 levels(data_munged$EVTYPE) <- gsub("COLD/WIND","COLD/WIND CHILL",levels(data_munged$EVTYPE))
 
-# Special case - explicitly renamed in NWS documentation
+# Special case - explicitly renamed in NWSI 10-1605
 levels(data_munged$EVTYPE) <- gsub("LANDSLIDE","DEBRIS FLOW",levels(data_munged$EVTYPE))
 
-# Special cases - explicitly mentioned in event type description in NWS documentation
+# Special cases - explicitly mentioned in event type description in NWSI 10-1605
 data_munged$EVTYPE[grepl("HYPOTHERMIA",data_munged$EVTYPE)]<-as.factor("COLD/WIND CHILL")
 data_munged$EVTYPE[grepl("SLIDE",data_munged$EVTYPE)]<-as.factor("DEBRIS FLOW")
 data_munged$EVTYPE[grepl("FREEZE",data_munged$EVTYPE)]<-as.factor("FROST/FREEZE")
@@ -119,9 +124,10 @@ data_munged$EVTYPE[grepl("WINTRY",data_munged$EVTYPE)]<-as.factor("WINTER WEATHE
 data_munged$EVTYPE[grepl("DAM BREAK",data_munged$EVTYPE)]<-as.factor("FLASH FLOOD")
 
 data_munged<-droplevels(data_munged) # drop unused levels
-message("[Drop 2 ] #Levels :: ", length(levels(data_munged$EVTYPE)))
+message("[MUNGE Drop 2] #Levels :: ", length(levels(data_munged$EVTYPE)))
 
-# temporarily rename MARINE THUNDERSTORM WIND to mtsw so that we don't lose it
+# temporarily rename MARINE THUNDERSTORM WIND to mtsw so that we don't lose it when
+#   we replace THUNDERSTORM in a later step
 levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),"mtsw")
 data_munged$EVTYPE[grepl("MARINE THUNDERSTORM WIND",data_munged$EVTYPE)]<-as.factor("mtsw")
 
@@ -136,32 +142,46 @@ data_munged$EVTYPE[grepl("THUNDERSTORM",data_munged$EVTYPE)]<-as.factor("THUNDER
 # restore MARINE THUNDERSTORM WIND
 data_munged$EVTYPE[grepl("mtsw",data_munged$EVTYPE)]<-as.factor("MARINE THUNDERSTORM WIND")
 
+# load master event types
+#   Event_Types.txt is a distinct list of Official Events manually pulled out of
+#     NWSI 10-1605 8/17/2007, Section 2.1.1
+#   https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf
+event_type_official <- read.delim("Event_Types.txt",header = FALSE,col.names = "EventType")
+event_type_official$EventType <- as.factor(toupper(event_type_official$EventType))
+
 # cycle through the official event list, and rename the recorded events to match
 #   the official one IF the official one is a substring of the recorded event
-for(i in 1:nrow(et)) {
-  thisone<-levels(et$EventType)[i]
+for(i in 1:nrow(event_type_official)) {
+  thisone<-levels(event_type_official$EventType)[i]
   levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),thisone)
   data_munged$EVTYPE[grepl(thisone,data_munged$EVTYPE)]<-as.factor(thisone)
 }
 
 data_munged<-droplevels(data_munged) # drop unused levels
-message("[Drop 3 ] #Levels :: ", length(levels(data_munged$EVTYPE)))
-########## FINISH EVENT TYPE MUNGING #########
+message("[MUNGE Drop 3] #Levels :: ", length(levels(data_munged$EVTYPE)))
 
-EVTYPE_TABLE <- data.frame(levels(data_munged$EVTYPE))
-unmatched<-data.frame(setdiff(data_munged$EVTYPE, et$EventType))
+# now we need take all of the Event Types that didn't map to an official event
+#   and combine them into a single event name "_ALL_OTHERS", so that we can
+#   gauge the impact of the unmatched data
+unmatched<-data.frame(setdiff(data_munged$EVTYPE, event_type_official$EventType))
 names(unmatched)<-c("EVTYPE")
 
 levels(data_munged$EVTYPE) = c(levels(data_munged$EVTYPE),"_ALL_OTHERS")
 for(i in 1:nrow(unmatched)) {
   thisone<-levels(unmatched$EVTYPE)[i]
   levels(data_munged$EVTYPE)[levels(data_munged$EVTYPE)==thisone] <- "_ALL_OTHERS"
-#  levels(data_munged$EVTYPE) <- gsub(thisone,"_ALL_OTHERS",levels(data_munged$EVTYPE))
 }
 data_munged<-droplevels(data_munged) # drop unused levels
-message("[Final  ] #Levels :: ", length(levels(data_munged$EVTYPE)))
+message("[MUNGE FINAL ] #Levels :: ", length(levels(data_munged$EVTYPE)))
+########## FINISH EVENT TYPE MUNGING #########
 
-####
+########## START ECONOMIC IMPACT MUNGING ##########
+# Strategy to clean up Property and Crop Damage fields:
+# 1. Replace the multiplier in PROPDMGEXP/CROPDMGEXP with a numeric
+#     value, store in new field PROPMULT/CROPMULT
+# 2. Add new field PROPVAL/CROPVAL to hold product of PROPDMG*PROPVAL and
+#     CROPDMG*CROPVAL
+
 replaceMultiplier <- function(x){
   # this function will convert the code given in PROPDMGEXP and CROPDMGEXP to the
   #   full multiplier that it represents
@@ -185,33 +205,35 @@ replaceMultiplier <- function(x){
   ret
 }
 
-data_pass3 <- data_munged
+# create new functions to hold numeric multiplier
+data_munged$PROPMULT<-
+  sapply(as.character(data_munged$PROPDMGEXP), FUN=replaceMultiplier)
+data_munged$CROPMULT<-
+  sapply(as.character(data_munged$CROPDMGEXP), FUN=replaceMultiplier)
 
-data_pass3$PROPMULT<-
-  sapply(as.character(data_pass3$PROPDMGEXP), FUN=replaceMultiplier)
-data_pass3$PROPVAL<-data_pass3$PROPDMG * data_pass3$PROPMULT
+# create functions to hold computed damage
+data_munged$PROPVAL<-data_munged$PROPDMG * data_munged$PROPMULT
+data_munged$CROPVAL<-data_munged$CROPDMG * data_munged$CROPMULT
 
-data_pass3$CROPMULT<-
-  sapply(as.character(data_pass3$CROPDMGEXP), FUN=replaceMultiplier)
-data_pass3$CROPVAL<-data_pass3$CROPDMG * data_pass3$CROPMULT
+########## FINISH ECONOMIC IMPACT MUNGING #########
 
-
+## Build some summary values
 # crunch it up
-data_crunch <- data_pass3 %>%
+data_crunch <- data_munged %>%
 group_by(EVTYPE) %>%
 summarise(sumF=sum(FATALITIES),
           sumI=sum(INJURIES),
+          sumFI=sum(FATALITIES + INJURIES),
           sumP=sum(PROPVAL),
           sumC=sum(CROPVAL),
-          meanF=round(mean(FATALITIES),3),
-          meanI=round(mean(INJURIES),3),
-          meanP=round(mean(PROPVAL),3),
-          meanC=round(mean(CROPVAL),3))
-
-# Population health = FATALITIES, INJURIES
-
-# economic consequences: PROPDMG, CROPDMG hold dollar amount, PROPDMGEXP, CROPDMGEXP
-# hold character showing magnitude of PROPDMG/CROPDMG (i.e. "B","H")
+          sumPC=sum(PROPVAL + CROPVAL),
+          meanF=round(mean(FATALITIES),1),
+          meanI=round(mean(INJURIES),1),
+          meanFI=round(mean(FATALITIES + INJURIES),1),
+          meanP=round(mean(PROPVAL),2),
+          meanC=round(mean(CROPVAL),2),
+          meanPC=round(mean(PROPVAL + CROPVAL),2)
+          )
 
 # output proc time
 print(proc.time() - starttime)
