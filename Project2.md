@@ -1,10 +1,14 @@
-# Rep Data Project 2 (BETTER TITLE NEEDED)
+# National Weather Service storm data analysis of Human Health and Economic Impact
 Gene Kaufman  
 January 15, 2016  
 
 # Synopsis
-
-Synopsis: Immediately after the title, there should be a synopsis which describes and summarizes your analysis in at most 10 complete sentences.
+The data from the National Weather Service is comprised of storm data from 1950-2011. The data consisted solely of Tornado activity until 1955, and only 
+Tornado, Thunderstorm Wind and Hail from 1955-1996. Since 1996, the data includes information on all storm types. However, the recorded event types differ 
+greatly from the offically recognized event types in that there are numerous spelling and formatting errors, as well as many that are vague and ambiguous and 
+don't map cleanly to a single official event type. A great effort has been made in this analysis to re-classify the event types as much as possible. Summarization 
+of metrics per event type were performed, and the results show that Tornados have had the greatest impact on human health, while Hurricanes have had the greatest 
+economic impact (specifically, property and crop damage).
 
 # Data Processing
 First, load some libraries and set some options
@@ -20,8 +24,6 @@ library(stringr)
 Load the file into a data frame
 
 ```r
-##### DATA PROCESSING ####
-#### Retrieve and load data ####
 data_file_url<-"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 data_file_local<-"storm.data.csv.bz2"
 data_file_dir<-"data/"
@@ -47,7 +49,7 @@ data_raw$PROPDMGEXP <- as.factor(toupper(data_raw$PROPDMGEXP))
 data_raw$CROPDMGEXP <- as.factor(toupper(data_raw$CROPDMGEXP))
 ```
 
-Next, remove all fields, keeping only the ones that we'll need  
+Next, remove all extraneous fields, keeping only the ones that we'll need    
 Population health:  
 - **FATALITIES**, **INJURIES**  
 Economic consequences:  
@@ -192,7 +194,7 @@ for(i in 1:nrow(unmatched)) {
 ### Data Munging: Property and Crop Damage
 **Strategy to clean up Property and Crop Damage fields:**  
 1. Replace the multiplier in PROPDMGEXP/CROPDMGEXP with a numeric value, store in new field PROPMULT/CROPMULT  
-2. Add new field PROPVAL/CROPVAL to hold product of PROPDMG*PROPVAL and CROPDMG*CROPVAL  
+2. Add new field PROPVAL/CROPVAL to hold product of PROPDMG \* PROPVAL and CROPDMG \* CROPVAL  
 
 ```r
 replaceMultiplier <- function(x){
@@ -233,9 +235,132 @@ data_munged$PROPVAL<-data_munged$PROPDMG * data_munged$PROPMULT
 data_munged$CROPVAL<-data_munged$CROPDMG * data_munged$CROPMULT
 ```
 
-### Summarize cleaned-up data
+### Summarize cleaned-up data  
+Group by eventtype, add Sum and Mean fields for the various fields
 
+```r
+data_crunch <- data_munged %>%
+filter(EVTYPE != "_ALL_OTHERS") %>%
+group_by(EVTYPE) %>%
+summarise(sumF=sum(FATALITIES),
+          sumI=sum(INJURIES),
+          sumFI=sum(FATALITIES + INJURIES),
+          sumP=sum(PROPVAL),
+          sumC=sum(CROPVAL),
+          sumPC=sum(PROPVAL + CROPVAL),
+          meanF=round(mean(FATALITIES),1),
+          meanI=round(mean(INJURIES),1),
+          meanFI=round(mean(FATALITIES + INJURIES),1),
+          meanP=round(mean(PROPVAL),2),
+          meanC=round(mean(CROPVAL),2),
+          meanPC=round(mean(PROPVAL + CROPVAL),2)
+          )
+```
 
+Pull out top 10 Event Types by FATALITIES, INJURIES and combined Property/Crop Damage
+
+```r
+data_by_sumF <- data_crunch %>%
+  arrange(desc(sumF))
+data_by_sumF<-data_by_sumF[1:10,]
+
+data_by_sumI <- data_crunch %>%
+  arrange(desc(sumI))
+data_by_sumI<-data_by_sumI[1:10,]
+
+data_by_sumPC <- data_crunch %>%
+  arrange(desc(sumPC))
+data_by_sumPC<-data_by_sumPC[1:10,]
+```
+
+Create some plots showing top 10 Event Types
+
+```r
+library(ggplot2)
+
+# helper function to make big numbers more human-friendly
+bigamount<-function(amt) {
+  if(length(amt)>1) {
+    amt=amt[2]
+  }
+
+  if (amt > 10^9) {
+    lpart<-format(as.integer(amt/(10^9)),scientific=FALSE)
+    ret<-paste0(lpart,"B")
+  } else if (amt > 10^6) {
+    lpart<-format(as.integer(amt/(10^6)),scientific=FALSE)
+    ret<-paste0(lpart,"M")
+  } else if (amt > 10^3) {
+    lpart<-format(as.integer(amt/(10^3)),scientific=FALSE)
+    ret<-paste0(lpart,"K")
+  } else {
+    ret<-format(amt,scientific = FALSE)
+  }
+  ret
+}
+
+thisbreaks=seq(0,7000,1000)
+thislabels=lapply(thisbreaks,FUN = bigamount)
+plot_sumF<-ggplot(data_by_sumF, aes(EVTYPE,sumF)) +
+  geom_bar(stat="identity") +
+  ggtitle("Total Fatalities by Weather Event Type") +
+  xlab("Weather Event") +
+  scale_y_continuous(name="Fatalities",
+                     breaks=thisbreaks,
+                     labels=thislabels) +
+  theme(axis.text.x=element_text(angle=45,hjust=1),
+        axis.text.y=element_text(angle=0))
+
+thisbreaks=seq(0,100000,10000)
+thislabels=lapply(thisbreaks,FUN = bigamount)
+plot_sumI<-ggplot(data_by_sumI, aes(EVTYPE,sumI)) +
+  geom_bar(stat="identity") +
+  ggtitle("Total Injuries by Weather Event Type") +
+  xlab("Weather Event") +
+  scale_y_continuous(name="Injuries",
+                     breaks=thisbreaks,
+                     labels=thislabels) +
+  theme(axis.text.x=element_text(angle=45,hjust=1),
+        axis.text.y=element_text(angle=0))
+
+thisbreaks=seq(0,10^11,10^10)
+thislabels=lapply(thisbreaks,FUN = bigamount)
+plot_sumPC<-ggplot(data_by_sumPC, aes(EVTYPE,sumPC)) +
+  geom_bar(stat="identity") +
+  ggtitle("Total Property + Crop Damage by Weather Event Type") +
+  xlab("Weather Event") +
+  scale_y_continuous(name="US $",
+                     breaks=thisbreaks,
+                     labels=thislabels
+                     ) +
+  theme(axis.text.x=element_text(angle=45,hjust=1),
+        axis.text.y=element_text(angle=0))
+```
+### Analysis of data  
+**Top 10 Event Types resulting in Fatalities**  
+
+```r
+print(plot_sumF)
+```
+
+![](Project2_files/figure-html/show_plot1-1.png) 
+
+**Top 10 Event Types resulting in Injuries**  
+
+```r
+print(plot_sumI)
+```
+
+![](Project2_files/figure-html/show_plot2-1.png) 
+
+**Top 10 Event Types resulting in Property or Crop Damage**  
+
+```r
+print(plot_sumPC)
+```
+
+![](Project2_files/figure-html/show_plot3-1.png) 
 
 ## Results
-
+Based on the data from the National Weather Service, Tornados have had the most human health impact, as they have caused the most Fatalities and Injuries of 
+all of the weather event types. However, when it comes to economic impact, Hurricanes have caused the most property and crop damage.
