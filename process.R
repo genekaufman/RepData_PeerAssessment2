@@ -191,7 +191,7 @@ replaceMultiplier <- function(x){
   #   Million and Billion. '+' is 1. Anything else cannot be interpreted, so we'll set it to 0
   x_num <- suppressWarnings(as.numeric(x))
   if (is.numeric(x_num) && !(is.na(x_num))) {
-    ret<-10 
+    ret<-10
   } else if(x=="+") {
     ret<-1
   } else if(x=="H") {
@@ -209,10 +209,22 @@ replaceMultiplier <- function(x){
 }
 
 # create new functions to hold numeric multiplier
+message("starting sapply 1")
+print(proc.time() - starttime)
+steptime <- proc.time()
 data_munged$PROPMULT<-
   sapply(as.character(data_munged$PROPDMGEXP), FUN=replaceMultiplier)
+
+message("starting sapply 2")
+print(proc.time() - steptime)
+#print(proc.time() - starttime)
+steptime <- proc.time()
+
 data_munged$CROPMULT<-
   sapply(as.character(data_munged$CROPDMGEXP), FUN=replaceMultiplier)
+message("finished sapply 2")
+print(proc.time() - steptime)
+#print(proc.time() - starttime)
 
 # create functions to hold computed damage
 data_munged$PROPVAL<-data_munged$PROPDMG * data_munged$PROPMULT
@@ -223,6 +235,7 @@ data_munged$CROPVAL<-data_munged$CROPDMG * data_munged$CROPMULT
 ## Build some summary values
 # crunch it up
 data_crunch <- data_munged %>%
+filter(EVTYPE != "_ALL_OTHERS") %>%
 group_by(EVTYPE) %>%
 summarise(sumF=sum(FATALITIES),
           sumI=sum(INJURIES),
@@ -237,9 +250,23 @@ summarise(sumF=sum(FATALITIES),
           meanC=round(mean(CROPVAL),2),
           meanPC=round(mean(PROPVAL + CROPVAL),2)
           )
+data_by_sumFI <- data_crunch %>%
+  arrange(desc(sumFI))
+data_by_sumPC <- data_crunch %>%
+  arrange(desc(sumPC))
 
 # output proc time
+message("finished all")
 print(proc.time() - starttime)
+
+# library(ggplot2)
+# # create ggplot
+# thisplot<-ggplot(data_crunch, aes(year,total_emissions)) +
+#   geom_line() +
+#   facet_grid(~type) +
+#
+#   scale_x_continuous(breaks=xvals,minor_breaks=NULL) +
+#   theme(panel.margin = unit(1, "lines"))
 
 cleanAllButDR <- function(){
   rm(list=ls()[ls()!="data_raw" & ls()!="cleacleanAllButDR"])

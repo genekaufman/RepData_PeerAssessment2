@@ -103,7 +103,7 @@ if (!exists(&quot;data_raw&quot;)) {
 <pre class="r"><code>data_raw$EVTYPE &lt;- as.factor(toupper(data_raw$EVTYPE))
 data_raw$PROPDMGEXP &lt;- as.factor(toupper(data_raw$PROPDMGEXP))
 data_raw$CROPDMGEXP &lt;- as.factor(toupper(data_raw$CROPDMGEXP))</code></pre>
-<p>First, remove all fields, keeping only the ones that we’ll need<br />Population health:<br />- <strong>FATALITIES</strong>, <strong>INJURIES</strong><br />Economic consequences:<br />- <strong>PROPDMG</strong>, <strong>CROPDMG</strong> hold dollar amount<br />- <strong>PROPDMGEXP</strong>, <strong>CROPDMGEXP</strong> hold character showing magnitude of PROPDMG/CROPDMG (i.e. “B”,“H”)</p>
+<p>Next, remove all fields, keeping only the ones that we’ll need<br />Population health:<br />- <strong>FATALITIES</strong>, <strong>INJURIES</strong><br />Economic consequences:<br />- <strong>PROPDMG</strong>, <strong>CROPDMG</strong> hold dollar amount<br />- <strong>PROPDMGEXP</strong>, <strong>CROPDMGEXP</strong> hold character showing magnitude of PROPDMG/CROPDMG (i.e. “B”,“H”)</p>
 <pre class="r"><code>wanted_fields &lt;- c(&quot;BGN_DATE&quot;,&quot;STATE&quot;,&quot;EVTYPE&quot;,&quot;FATALITIES&quot;,&quot;INJURIES&quot;,
                    &quot;PROPDMG&quot;,&quot;PROPDMGEXP&quot;,&quot;CROPDMG&quot;,&quot;CROPDMGEXP&quot;)
 data_raw_selected &lt;- data_raw %&gt;%
@@ -117,11 +117,11 @@ data_raw_selected &lt;- data_raw %&gt;%
 
 # data_munged will hold the data as we're reducing the event types
 data_munged &lt;- data_filtered</code></pre>
-<p>Fix a data error in one record - this one was is mentioned in the record comments to be $115M, not $115B<br />Credit: Robert Carman in the <a href="Class%20Discussion%20forums"><a href="https://www.coursera.org/learn/reproducible-research/discussions/DrCe_bl7EeWjxw7W9fJX5Q" class="uri">https://www.coursera.org/learn/reproducible-research/discussions/DrCe_bl7EeWjxw7W9fJX5Q</a></a></p>
+<p>Fix a data error in one record - this one was is mentioned in the record comments to be $115M, not $115B<br />Credit: Robert Carman in the <a href="https://www.coursera.org/learn/reproducible-research/discussions/DrCe_bl7EeWjxw7W9fJX5Q">Class Discussion forums</a></p>
 <pre class="r"><code>data_munged$PROPDMGEXP[data_munged$PROPDMGEXP == 'B' &amp; data_munged$BGN_DATE == '1/1/2006 0:00:00']&lt;- as.factor(&quot;M&quot;)</code></pre>
 </div>
-<div id="data-munging-event-type" class="section level2">
-<h2>Data Munging: Event Type</h2>
+<div id="data-munging-event-type" class="section level3">
+<h3>Data Munging: Event Type</h3>
 <p><strong>Strategy to clean up messy event types:</strong><br />1. Attempt to reduce number of distinct events by removing non-letters, clean up spacing, expand abbreviations and fix obvious misspellings<br />2. Explicitly replace events that are mentioned in the NWS documentation as being counted as another event<br />3. Loop through official event list, replacing record events if the official event is a substring of the recorded event (e.g. “TORNADO F1” -&gt; “TORNADO”)</p>
 <pre class="r"><code># some basic replacements to standardize some terms and misspellings
 levels(data_munged$EVTYPE) &lt;- gsub(&quot;  &quot;,&quot; &quot;,levels(data_munged$EVTYPE))
@@ -221,6 +221,49 @@ for(i in 1:nrow(unmatched)) {
   thisone&lt;-levels(unmatched$EVTYPE)[i]
   levels(data_munged$EVTYPE)[levels(data_munged$EVTYPE)==thisone] &lt;- &quot;_ALL_OTHERS&quot;
 }</code></pre>
+</div>
+<div id="data-munging-property-and-crop-damage" class="section level3">
+<h3>Data Munging: Property and Crop Damage</h3>
+<p><strong>Strategy to clean up Property and Crop Damage fields:</strong><br />1. Replace the multiplier in PROPDMGEXP/CROPDMGEXP with a numeric value, store in new field PROPMULT/CROPMULT<br />2. Add new field PROPVAL/CROPVAL to hold product of PROPDMG<em>PROPVAL and CROPDMG</em>CROPVAL</p>
+<pre class="r"><code>replaceMultiplier &lt;- function(x){
+  # this function will convert the code given in PROPDMGEXP and CROPDMGEXP to the
+  #   full multiplier that it represents
+  # Per analysis by github user 'flyingdisc'
+  #   https://github.com/flyingdisc/RepData_PeerAssessment2/blob/master/how-to-handle-PROPDMGEXP.md
+  #   A numeric field is 10, while H,K,M,B represent Hundred, Thousand,
+  #   Million and Billion. '+' is 1. Anything else cannot be interpreted, so we'll set it to 0
+  x_num &lt;- suppressWarnings(as.numeric(x))
+  if (is.numeric(x_num) &amp;&amp; !(is.na(x_num))) {
+    ret&lt;-10
+  } else if(x==&quot;+&quot;) {
+    ret&lt;-1
+  } else if(x==&quot;H&quot;) {
+    ret&lt;-100
+  } else if(x==&quot;K&quot;) {
+    ret&lt;-1000
+  } else if(x==&quot;M&quot;) {
+    ret&lt;-1000000
+  } else if(x==&quot;B&quot;) {
+    ret&lt;-1000000000
+  } else { # anything else is garbage, set to zero so that calculation is zero
+    ret&lt;-0
+  }
+  ret
+}
+
+# create new fields to hold numeric multiplier
+data_munged$PROPMULT&lt;-
+  sapply(as.character(data_munged$PROPDMGEXP), FUN=replaceMultiplier)
+
+data_munged$CROPMULT&lt;-
+  sapply(as.character(data_munged$CROPDMGEXP), FUN=replaceMultiplier)
+
+# create fields to hold computed damage
+data_munged$PROPVAL&lt;-data_munged$PROPDMG * data_munged$PROPMULT
+data_munged$CROPVAL&lt;-data_munged$CROPDMG * data_munged$CROPMULT</code></pre>
+</div>
+<div id="summarize-cleaned-up-data" class="section level3">
+<h3>Summarize cleaned-up data</h3>
 </div>
 <div id="results" class="section level2">
 <h2>Results</h2>

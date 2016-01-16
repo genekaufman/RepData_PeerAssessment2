@@ -1,11 +1,6 @@
----
-title: "Rep Data Project 2 (BETTER TITLE NEEDED)"
-author: "Gene Kaufman"
-date: "January 15, 2016"
-output: 
-  html_document:
-    keep_md: true
----
+# Rep Data Project 2 (BETTER TITLE NEEDED)
+Gene Kaufman  
+January 15, 2016  
 
 # Synopsis
 
@@ -13,7 +8,8 @@ Synopsis: Immediately after the title, there should be a synopsis which describe
 
 # Data Processing
 First, load some libraries and set some options
-```{r setoptions, message=FALSE}
+
+```r
 require(knitr)
 opts_chunk$set(echo=TRUE, results="asis", warning=FALSE, message=FALSE)
 
@@ -22,7 +18,8 @@ library(stringr)
 ```
 
 Load the file into a data frame
-```{r load.data,cache=TRUE}
+
+```r
 ##### DATA PROCESSING ####
 #### Retrieve and load data ####
 data_file_url<-"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
@@ -43,7 +40,8 @@ if (!exists("data_raw")) {
 
 ### Prep Data for Analysis
 Many entries for **EVTYPE**, **PROPDMGEXP** and **CROPDMGEXP** are duplicated with different cases, set all to upper case
-```{r load.data2,cache=TRUE}
+
+```r
 data_raw$EVTYPE <- as.factor(toupper(data_raw$EVTYPE))
 data_raw$PROPDMGEXP <- as.factor(toupper(data_raw$PROPDMGEXP))
 data_raw$CROPDMGEXP <- as.factor(toupper(data_raw$CROPDMGEXP))
@@ -56,7 +54,8 @@ Economic consequences:
 - **PROPDMG**, **CROPDMG** hold dollar amount  
 - **PROPDMGEXP**, **CROPDMGEXP** hold character showing magnitude of PROPDMG/CROPDMG
   (i.e. "B","H")
-```{r select.fields}
+
+```r
 wanted_fields <- c("BGN_DATE","STATE","EVTYPE","FATALITIES","INJURIES",
                    "PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")
 data_raw_selected <- data_raw %>%
@@ -65,7 +64,8 @@ data_raw_selected <- data_raw %>%
 
 Filter out records that have at least 1 FATALITY, 1 INJURY,
 or at least $1 Property or Crop damage
-```{r filter.data}
+
+```r
 data_filtered <- data_raw_selected %>%
   filter(FATALITIES > 0 |
            INJURIES > 0 |
@@ -78,7 +78,8 @@ data_munged <- data_filtered
 
 Fix a data error in one record - this one was is mentioned in the record comments to be $115M, not $115B  
 Credit: Robert Carman in the [Class Discussion forums](https://www.coursera.org/learn/reproducible-research/discussions/DrCe_bl7EeWjxw7W9fJX5Q)  
-```{r fix.napa.valley}
+
+```r
 data_munged$PROPDMGEXP[data_munged$PROPDMGEXP == 'B' & data_munged$BGN_DATE == '1/1/2006 0:00:00']<- as.factor("M")
 ```
 
@@ -87,7 +88,8 @@ data_munged$PROPDMGEXP[data_munged$PROPDMGEXP == 'B' & data_munged$BGN_DATE == '
 1. Attempt to reduce number of distinct events by removing non-letters, clean up spacing, expand abbreviations and fix obvious misspellings  
 2. Explicitly replace events that are mentioned in the NWS documentation as being counted as another event  
 3. Loop through official event list, replacing record events if the official event is a substring of the recorded event (e.g. "TORNADO F1" -> "TORNADO")  
-```{r data.munge.event.type}
+
+```r
 # some basic replacements to standardize some terms and misspellings
 levels(data_munged$EVTYPE) <- gsub("  "," ",levels(data_munged$EVTYPE))
 levels(data_munged$EVTYPE) <- gsub("\\\\","/",levels(data_munged$EVTYPE))
@@ -191,7 +193,8 @@ for(i in 1:nrow(unmatched)) {
 **Strategy to clean up Property and Crop Damage fields:**  
 1. Replace the multiplier in PROPDMGEXP/CROPDMGEXP with a numeric value, store in new field PROPMULT/CROPMULT  
 2. Add new field PROPVAL/CROPVAL to hold product of PROPDMG*PROPVAL and CROPDMG*CROPVAL  
-```{r data.munge.damage.fields}
+
+```r
 replaceMultiplier <- function(x){
   # this function will convert the code given in PROPDMGEXP and CROPDMGEXP to the
   #   full multiplier that it represents
@@ -230,28 +233,9 @@ data_munged$PROPVAL<-data_munged$PROPDMG * data_munged$PROPMULT
 data_munged$CROPVAL<-data_munged$CROPDMG * data_munged$CROPMULT
 ```
 
-### Summarize cleaned-up data  
-Group by eventtype, add Sum and Mean fields for the various fields
-```{r crunch.data}
-data_crunch <- data_munged %>%
-group_by(EVTYPE) %>%
-summarise(sumF=sum(FATALITIES),
-          sumI=sum(INJURIES),
-          sumFI=sum(FATALITIES + INJURIES),
-          sumP=sum(PROPVAL),
-          sumC=sum(CROPVAL),
-          sumPC=sum(PROPVAL + CROPVAL),
-          meanF=round(mean(FATALITIES),1),
-          meanI=round(mean(INJURIES),1),
-          meanFI=round(mean(FATALITIES + INJURIES),1),
-          meanP=round(mean(PROPVAL),2),
-          meanC=round(mean(CROPVAL),2),
-          meanPC=round(mean(PROPVAL + CROPVAL),2)
-          )
+### Summarize cleaned-up data
 
-```
-### Analysis of data
-get a top 10 list of fatalities, injuries
-multichart of fatalities, injuries 
+
+
 ## Results
 
